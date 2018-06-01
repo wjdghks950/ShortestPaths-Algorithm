@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
+#include <Windows.h>
 
 #define INF 9999
 
@@ -56,44 +57,60 @@ int main(int argc, char *argv[])
 	FILE *fp = NULL;
 	Graph * graphMap = NULL;
 	int i = 0; 
+	__int64 frequency;
+	__int64 begin;
+	__int64 end;
 	double time_spent = 0.0F;
+
+	QueryPerformanceFrequency((LARGE_INTEGER *) &frequency); //For keeping time
 
 	fp = readFile(); //Establish input file stream
 
 	graphMap = createGraph(fp);
 
-	clock_t begin_dijkstra = clock();
+	QueryPerformanceCounter((LARGE_INTEGER *) &begin);
+
 	for (i = 0; i < graphMap->numV; i++) {
 		Dijkstra(graphMap, i); //Run Djikstra's algorithm V times to find All-source shortest paths
 	}
-	time_spent = (double) (clock() - begin_dijkstra) / CLOCKS_PER_SEC;
-	printf("It took %.6f seconds to compute shortest paths between cities with Dijkstra's algorithm as follows: \n\n", time_spent);
+
+	QueryPerformanceCounter((LARGE_INTEGER *) &end);
+	__int64 elapsed = end - begin;
+	time_spent = (double)elapsed / (double)frequency;
+	printf("It took %.3f seconds to compute shortest paths between cities with Dijkstra's algorithm as follows: \n\n", time_spent * 1000);
 	printShortestPath(graphMap);
 
 	memset(graphMap->resultMat, 0, sizeof(int) * 100 * 100);
 
 
 
-	clock_t begin_bellman = clock();
+	QueryPerformanceCounter((LARGE_INTEGER *) &begin);
+
 	for (i = 0; i < graphMap->numV; i++) {
 		int negativeCycle = BellmanFord(graphMap, i); //Run Bellman-Ford algorithm V times to find All-source shortest paths
 		if (!negativeCycle) {
-			fprintf(stderr, "Negative-weight cycles have been detected. ");
+			fprintf(stderr, "Negative-weight cycles have been detected by Bellman-Ford algorithm.\nShortest paths could not be found.\n");
+			exit(0);
 		}
 	}
-	time_spent = (double) (clock() - begin_bellman) / CLOCKS_PER_SEC;
-	printf("It took %f seconds to compute shortest paths between cities with Bellman-Ford algorithm as follows: \n\n", time_spent);
+
+	QueryPerformanceCounter((LARGE_INTEGER *) &end);
+	elapsed = end - begin;
+	time_spent = (double)elapsed / (double)frequency;
+	printf("It took %.3f seconds to compute shortest paths between cities with Bellman-Ford algorithm as follows: \n\n", time_spent * 1000);
 	printShortestPath(graphMap);
 
 	memset(graphMap->resultMat, 0, sizeof(int) * 100 * 100); //Clear resultMat for the next algorithm
 
 
 
-	clock_t begin_floyd = clock();
+	QueryPerformanceCounter((LARGE_INTEGER *) &begin);
 	Floyd(graphMap); //Run Floyd-Warshall algorithm to find All-source shortest paths
 
-	time_spent = (double)(clock() - begin_floyd) / CLOCKS_PER_SEC;
-	printf("It took %.6f seconds to compute shortest paths between cities with Floyd algorithm as follows: \n\n", time_spent);
+	QueryPerformanceCounter((LARGE_INTEGER *) &end);
+	elapsed = end - begin;
+	time_spent = (double)elapsed / (double)frequency;
+	printf("It took %.3f seconds to compute shortest paths between cities with Floyd algorithm as follows: \n\n", time_spent * 1000);
 	printShortestPath(graphMap);
 
 }
@@ -162,12 +179,12 @@ Graph * createGraph(FILE * fp)
 	j = 0;
 
 	while (!feof(fp)) {
-		char str[20];
+		char str[30];
 		fscanf(fp, "%s", str); //Read each weight
 		if (!strcmp("INF", str)) {
 			strncpy(str, "9999\0", 5);
 		}
-		if (!isspace(str[0]) && isdigit(str[0])) {
+		if(!isspace(str[0]) && (isdigit(str[0]) || str[0] == '-')){
 			graphMap->weightMat[i][j] = atoi(str);
 
 			j++;
@@ -279,7 +296,7 @@ int BellmanFord(Graph * graphMap, int source)
 		int u = graphMap->edge[i].src;
 		int v = graphMap->edge[i].dest;
 		if (graphMap->vertexMat[v].discover > graphMap->vertexMat[u].discover + graphMap->edge[i].weight) { // d[v] > d[u] + w
-			return 0;
+			return 0; //return if negative weight cycle exists
 		}
 	}
 
